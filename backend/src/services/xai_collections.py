@@ -211,11 +211,15 @@ class XAICollectionsClient:
         collection_name = collection_name or self.default_collection
         top_k = top_k or self.top_k
         
-        # Get collection ID
-        collection_id = await self.get_collection(collection_name)
-        if not collection_id:
-            logger.warning(f"Collection '{collection_name}' not found")
-            return []
+        # If collection_name looks like an ID (starts with "collection_"), use it directly
+        if collection_name.startswith('collection_'):
+            collection_id = collection_name
+        else:
+            # Get collection ID by name
+            collection_id = await self.get_collection(collection_name)
+            if not collection_id:
+                logger.warning(f"Collection '{collection_name}' not found")
+                return []
         
         url = f"{self.base_url}/documents/search"  # Correct endpoint
         headers = {

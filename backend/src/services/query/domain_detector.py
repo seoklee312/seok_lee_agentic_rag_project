@@ -44,14 +44,61 @@ Examples:
 Respond with domain name or NEW:<domain_name>"""
         
         try:
-            response = await self.grok_client.chat_completion(
-                messages=[{"role": "user", "content": prompt}],
-                model="grok-3-mini",
-                max_tokens=20,
-                temperature=0
-            )
+            # # DISABLED: RAG-based domain detection (collections empty, takes 7s)
+            # if hasattr(self, 'xai_collections') and self.xai_collections:
+            #     try:
+            #         # Query each configured domain collection
+            #         best_domain = None
+            #         best_score = 0
+            #         
+            #         # Get collection mappings from config
+            #         collections_map = {}
+            #         if hasattr(self.xai_collections, 'config'):
+            #             collections_map = self.xai_collections.config.get('collections', {})
+            #         
+            #         for domain in configured_domains:
+            #             collection_name = collections_map.get(domain)
+            #             if not collection_name:
+            #                 continue
+            #                 
+            #             try:
+            #                 results = await self.xai_collections.query(
+            #                     query_text=query,
+            #                     collection_name=collection_name,
+            #                     top_k=1
+            #                 )
+            #                 if results and len(results) > 0:
+            #                     score = results[0].get('score', 0)
+            #                     if score > best_score:
+            #                         best_score = score
+            #                         best_domain = domain
+            #             except:
+            #                 continue
+            #         
+            #         # If RAG found a good match (score > 0.7), use it
+            #         if best_domain and best_score > 0.7:
+            #             logger.info(f"⚡ RAG-detected domain: {best_domain} (score: {best_score:.2f})")
+            #             domain_obj = self.domain_manager.load_domain(best_domain)
+            #             return {
+            #                 'domain': best_domain,
+            #                 'is_configured': True,
+            #                 'system_prompt': domain_obj.get_system_prompt()
+            #             }
+            #     except Exception as e:
+            #         logger.debug(f"RAG domain detection failed: {e}")
             
-            detected = response['choices'][0]['message']['content'].strip()
+            # # DISABLED: LLM-based detection (saves 4s, RAG handles it)
+            # response = await self.grok_client.chat_completion(
+            #     messages=[{"role": "user", "content": prompt}],
+            #     model="grok-3-mini",
+            #     max_tokens=20,
+            #     temperature=0
+            # )
+            # 
+            # detected = response.get('content', '').strip()
+            
+            # Default to first configured domain or general
+            detected = configured_domains[0] if configured_domains else 'general'
             
             # Check if new domain
             if detected.startswith("NEW:"):
@@ -68,7 +115,7 @@ Respond with domain name or NEW:<domain_name>"""
             elif detected in configured_domains:
                 logger.info(f"✅ Configured domain: {detected} for '{query[:50]}...'")
                 
-                domain_obj = self.domain_manager.get_domain(detected)
+                domain_obj = self.domain_manager.load_domain(detected)
                 return {
                     'domain': detected,
                     'is_configured': True,

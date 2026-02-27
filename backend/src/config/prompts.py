@@ -493,3 +493,36 @@ def extract_confidence(text: str) -> str:
     if match:
         return match.group(1).upper()
     return "MEDIUM"
+
+# ============================================================================
+# AGENTIC RAG PROMPTS
+# ============================================================================
+
+AGENTIC_GENERATION_PROMPT = """{system_prompt}
+
+Context (with sources):
+{context}
+
+Question: {question}
+
+Instructions for a PERFECT answer:
+1. Start with a direct, clear answer to the question (1-2 sentences)
+2. Provide 2-3 well-structured paragraphs with key details
+3. CRITICAL: Cite sources [1], [2], [3] immediately after EVERY factual claim
+4. Use specific details: numbers, dates, names, examples from context
+5. Organize logically: most important information first
+6. Write naturally - avoid robotic phrasing or hedging words
+7. End with a brief, professional disclaimer for medical/legal topics only
+
+Quality checklist:
+✓ Every fact has a citation
+✓ Answer is complete but concise
+✓ Language is clear and professional
+✓ Most important info comes first"""
+
+AGENTIC_VALIDATION_PROMPT = """Context: {context}
+
+Answer: {answer}
+
+Does the answer contain claims NOT supported by the context? Answer 'yes' or 'no'."""
+

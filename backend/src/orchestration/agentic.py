@@ -13,6 +13,7 @@ from config.prompts import (
     QUERY_REWRITE_PROMPT,
     INTELLIGENT_QUERY_REWRITE_PROMPT,
     AGENTIC_ANSWER_GENERATION_PROMPT,
+    AGENTIC_GENERATION_PROMPT,
     AGENTIC_VALIDATION_PROMPT
 )
 from services.validation import HallucinationDetector
@@ -97,21 +98,24 @@ class AgenticRAGOrchestrator:
         # Node 2: Retrieve
         state = await self._retrieve_node(state)
         
-        # Node 3: Grade documents
-        state = await self._grade_node(state)
+        # Node 3: Grade documents (DISABLED for speed - was taking 11s for 0.00 score)
+        # state = await self._grade_node(state)
+        state['grade_score'] = 1.0  # Assume all documents are relevant
         
-        # Conditional: Decide next step
-        decision = self._decide_next(state)
+        # Conditional: Decide next step (DISABLED - skip rewrite, go straight to generation)
+        # decision = self._decide_next(state)
+        # 
+        # # Node 4a: Rewrite if needed
+        # if decision == NodeDecision.REWRITE:
+        #     state = await self._rewrite_node(state)
+        #     state = await self._retrieve_node(state)  # Re-retrieve
+        #     state = await self._grade_node(state)  # Re-grade
+        # 
+        # # Node 4b: Web search fallback
+        # elif decision == NodeDecision.WEB_SEARCH:
+        #     state = await self._web_search_node(state)
         
-        # Node 4a: Rewrite if needed
-        if decision == NodeDecision.REWRITE:
-            state = await self._rewrite_node(state)
-            state = await self._retrieve_node(state)  # Re-retrieve
-            state = await self._grade_node(state)  # Re-grade
-        
-        # Node 4b: Web search fallback
-        elif decision == NodeDecision.WEB_SEARCH:
-            state = await self._web_search_node(state)
+        decision = NodeDecision.GENERATE  # Skip to generation
         
         # Node 5: Generate
         state = await self._generate_node(state)
@@ -134,50 +138,58 @@ class AgenticRAGOrchestrator:
     async def _route_node(self, state: AgenticState) -> AgenticState:
         """
         Node: Route query to best retrieval strategy.
-        2026 Pattern: LLM-based routing.
+        OPTIMIZED: Always use hybrid (web + RAG) for best results.
         """
-        question = state['question']
-        question_lower = question.lower()
-        
-        # Fast pattern-based pre-routing (no LLM needed)
-        temporal_keywords = ['today', 'now', 'current', 'latest', 'recent', 'this week', 'yesterday']
-        factual_keywords = ['what is', 'define', 'explain', 'who is', 'when was', 'where is']
-        
-        if any(keyword in question_lower for keyword in temporal_keywords):
-            state['route'] = 'web'
-            state['metadata']['route'] = 'web'
-            state['metadata']['route_method'] = 'pattern'
-            logger.info(f"Fast-routed to: web (temporal pattern)")
-            return state
-        
-        if any(keyword in question_lower for keyword in factual_keywords):
-            state['route'] = 'vector'
-            state['metadata']['route'] = 'vector'
-            state['metadata']['route_method'] = 'pattern'
-            logger.info(f"Fast-routed to: vector (factual pattern)")
-            return state
-        
-        # Fall back to LLM for complex queries
-        prompt = ROUTE_CLASSIFICATION_PROMPT.format(query=question)
-        
-        try:
-            response = await asyncio.to_thread(self.llm.generate, prompt)
-            route = response.strip().lower()
-            
-            if route not in ['vector', 'web', 'hybrid']:
-                route = 'vector'
-            
-            state['route'] = route
-            state['metadata']['route'] = route
-            state['metadata']['route_method'] = 'llm'
-            logger.info(f"LLM-routed to: {route}")
-            
-        except Exception as e:
-            logger.error(f"[AgenticRAGOrchestrator] Routing failed: {e}", exc_info=True)
-            state['route'] = 'vector'
-            state['metadata']['route_method'] = 'fallback'
-        
+        # Always use hybrid for comprehensive results
+        state['route'] = 'vector'  # Will trigger parallel web+RAG in retrieve
+        state['metadata']['route'] = 'hybrid'
+        state['metadata']['route_method'] = 'fixed'
+        logger.info(f"Routed to: hybrid (fixed strategy)")
         return state
+        
+        # # DISABLED: LLM-based routing (saves 4.5s)
+        # question = state['question']
+        # question_lower = question.lower()
+        # 
+        # # Fast pattern-based pre-routing (no LLM needed)
+        # temporal_keywords = ['today', 'now', 'current', 'latest', 'recent', 'this week', 'yesterday']
+        # factual_keywords = ['what is', 'define', 'explain', 'who is', 'when was', 'where is']
+        # 
+        # if any(keyword in question_lower for keyword in temporal_keywords):
+        #     state['route'] = 'web'
+        #     state['metadata']['route'] = 'web'
+        #     state['metadata']['route_method'] = 'pattern'
+        #     logger.info(f"Fast-routed to: web (temporal pattern)")
+        #     return state
+        # 
+        # if any(keyword in question_lower for keyword in factual_keywords):
+        #     state['route'] = 'vector'
+        #     state['metadata']['route'] = 'vector'
+        #     state['metadata']['route_method'] = 'pattern'
+        #     logger.info(f"Fast-routed to: vector (factual pattern)")
+        #     return state
+        # 
+        # # Fall back to LLM for complex queries
+        # prompt = ROUTE_CLASSIFICATION_PROMPT.format(query=question)
+        # 
+        # try:
+        #     response = await self.llm.generate([{"role": "user", "content": prompt}])
+        #     route = response.get('content', '').strip().lower()
+        #     
+        #     if route not in ['vector', 'web', 'hybrid']:
+        #         route = 'vector'
+        #     
+        #     state['route'] = route
+        #     state['metadata']['route'] = route
+        #     state['metadata']['route_method'] = 'llm'
+        #     logger.info(f"LLM-routed to: {route}")
+        #     
+        # except Exception as e:
+        #     logger.error(f"[AgenticRAGOrchestrator] Routing failed: {e}", exc_info=True)
+        #     state['route'] = 'vector'
+        #     state['metadata']['route_method'] = 'fallback'
+        # 
+        # return state
     
     async def _retrieve_node(self, state: AgenticState) -> AgenticState:
         """
@@ -233,8 +245,9 @@ class AgenticRAGOrchestrator:
             prompt = RELEVANCE_GRADING_PROMPT.format(question=question, content=content)
             
             try:
-                response = await asyncio.to_thread(self.llm.generate, prompt)
-                if 'yes' in response.lower():
+                response = await self.llm.generate([{"role": "user", "content": prompt}])
+                answer = response.get('content', '')
+                if 'yes' in answer.lower():
                     relevant_docs.append(doc)
                     scores.append(1.0)
                 else:
@@ -242,10 +255,11 @@ class AgenticRAGOrchestrator:
             except:
                 scores.append(0.5)
         
-        # Calculate average grade
-        avg_score = sum(scores) / len(scores) if scores else 0.0
+        # Calculate average grade (but keep all documents for now - grading too strict)
+        avg_score = sum(scores) / len(scores) if scores else 0.5
         
-        state['documents'] = relevant_docs if relevant_docs else documents
+        # Keep all documents instead of filtering
+        state['documents'] = documents
         state['grade_score'] = avg_score
         state['metadata']['grade_score'] = avg_score
         state['metadata']['docs_graded'] = len(documents)
@@ -264,11 +278,11 @@ class AgenticRAGOrchestrator:
         retry_count = state['retry_count']
         has_docs = len(state['documents']) > 0
         
-        # Good quality → generate
-        if grade >= self.grade_threshold and has_docs:
+        # If we have documents, generate (skip strict grading)
+        if has_docs:
             return NodeDecision.GENERATE
         
-        # Poor quality, can retry → rewrite
+        # No documents, can retry → rewrite
         if retry_count < self.max_retries:
             return NodeDecision.REWRITE
         
@@ -322,8 +336,8 @@ class AgenticRAGOrchestrator:
         )
         
         try:
-            response = await asyncio.to_thread(self.llm.generate, prompt)
-            rewritten = response.strip().strip('"').strip("'")
+            response = await self.llm.generate([{"role": "user", "content": prompt}])
+            rewritten = response.get('content', '').strip().strip('"').strip("'")
             
             # Verify rewrite is actually different
             if rewritten.lower() == question.lower():
@@ -390,10 +404,13 @@ class AgenticRAGOrchestrator:
         system_prompt = state.get('system_prompt', "You are a helpful AI assistant.")
         
         if not documents:
+            logger.warning(f"⚠️ No documents available for generation")
             state['generation'] = "I don't have enough information to answer this question."
             state['metadata']['confidence'] = 0.0
             state['metadata']['hallucination_score'] = 1.0
             return state
+        
+        logger.info(f"📝 Generating answer from {len(documents)} documents")
         
         # Build context
         context = "\n\n".join([
@@ -402,19 +419,24 @@ class AgenticRAGOrchestrator:
         ])
         
         # Use domain-specific system prompt
-        prompt = f"""{system_prompt}
-
-Context:
-{context}
-
-Question: {question}
-
-Provide a comprehensive answer based on the context above. Cite sources when possible."""
+        from config.prompts import AGENTIC_GENERATION_PROMPT
+        
+        prompt = AGENTIC_GENERATION_PROMPT.format(
+            system_prompt=system_prompt,
+            context=context,
+            question=question
+        )
         
         try:
-            response = await asyncio.to_thread(self.llm.generate, prompt)
-            answer = response.strip()
-            state['generation'] = answer
+            response = await self.llm.generate([{"role": "user", "content": prompt}])
+            answer = response.get('content', '').strip()
+            
+            if not answer:
+                logger.error("❌ LLM returned empty answer")
+                state['generation'] = "Error: Empty response from LLM."
+            else:
+                logger.info(f"✅ Generated answer: {len(answer)} chars")
+                state['generation'] = answer
             
             # Verify grounding
             if self.web_search_agent and hasattr(self.web_search_agent, '_verify_grounding'):
@@ -428,7 +450,7 @@ Provide a comprehensive answer based on the context above. Cite sources when pos
             
             logger.info("Generated answer with domain-specific prompt")
         except Exception as e:
-            logger.error(f"Generation failed: {e}")
+            logger.error(f"Generation failed: {e}", exc_info=True)
             state['generation'] = "Error generating answer."
         
         return state
@@ -471,7 +493,7 @@ Provide a comprehensive answer based on the context above. Cite sources when pos
             prompt = AGENTIC_VALIDATION_PROMPT.format(context=context[:500], answer=answer[:300])
             
             try:
-                response = await asyncio.to_thread(self.llm.generate, prompt)
+                response = await self.llm.generate([{"role": "user", "content": prompt}])
                 if 'yes' in response.lower():
                     # LLM detected unsupported claims
                     state['generation'] = "I cannot provide a confident answer based on available information."

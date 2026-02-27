@@ -37,7 +37,7 @@ Respond with ONLY: conversational OR domain_query"""
                 temperature=0
             )
             
-            intent = response['choices'][0]['message']['content'].strip().lower()
+            intent = response.get('content', '').strip().lower()
             
             if "conversational" in intent:
                 logger.info(f"💬 Conversational query: '{query[:50]}...'")

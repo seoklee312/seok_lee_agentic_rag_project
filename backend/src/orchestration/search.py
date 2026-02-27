@@ -57,8 +57,8 @@ class SearchOrchestrator:
         web_queries = [query]
         if self.query_optimizer and not is_web_agent:
             try:
-                understanding = self.query_optimizer.understand_query(query)
-                if understanding.get('web_queries'):
+                understanding = await self.query_optimizer.understand_query(query)
+                if understanding and understanding.get('web_queries'):
                     web_queries = understanding['web_queries'][:2]  # Limit to 2
                     logger.info(f"🔍 Web Query Expansion: {len(web_queries)} queries")
                     for i, wq in enumerate(web_queries, 1):
@@ -134,13 +134,15 @@ class SearchOrchestrator:
         results = []
         
         # Try xAI Collections first (if domain provided)
+        logger.info(f"🔍 xAI Collections check: client={self.xai_collections is not None}, domain={domain}")
         if self.xai_collections and domain:
             try:
                 collection_id = self._get_collection_id(domain)
+                logger.info(f"🔍 Collection ID for domain '{domain}': {collection_id}")
                 if collection_id:
                     results = await self.xai_collections.query(
-                        collection_id=collection_id,
-                        query=query,
+                        query_text=query,
+                        collection_name=collection_id,
                         top_k=5
                     )
                     if results and len(results) > 0:
@@ -186,16 +188,15 @@ class SearchOrchestrator:
         return results
     
     def _get_collection_id(self, domain: str) -> Optional[str]:
-        """Get xAI collection ID for domain."""
-        import os
-        
-        if not domain:
+        """Get xAI collection ID for domain from config."""
+        if not domain or not self.xai_collections:
             return None
         
-        collection_map = {
-            "medical": os.getenv("MEDICAL_COLLECTION_ID"),
-            "legal": os.getenv("LEGAL_COLLECTION_ID")
-        }
-        return collection_map.get(domain)
+        # Read from config.yaml via xAI Collections client
+        if hasattr(self.xai_collections, 'config'):
+            collections = self.xai_collections.config.get('collections', {})
+            return collections.get(domain)
+        
+        return None
     
 

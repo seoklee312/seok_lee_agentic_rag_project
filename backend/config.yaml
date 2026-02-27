@@ -6,9 +6,9 @@ grok:
   enabled: true
   api_key: ${GROK_API_KEY}  # Set via environment variable
   base_url: https://api.x.ai/v1
-  model: grok-3  # Default model - WINNER: Best accuracy (86.7%), fastest (4.18s)
+  model: grok-3-mini  # Default model - fastest and cheapest
   models:
-    default: grok-3  # BEST: Balanced speed, accuracy, cost
+    default: grok-3-mini  # Fastest for high-volume
     fast: grok-3-mini  # Cheapest & fastest for high-volume
     best: grok-4-0709  # For complex reasoning tasks
     vision: grok-2-vision-1212  # Vision model
@@ -32,6 +32,10 @@ xai_collections:
   chunk_overlap: 50
   top_k: 10
   timeout: 30
+  # Domain-specific collections (hardcoded IDs)
+  collections:
+    medical: collection_6b21935e-0400-4010-aabe-4113ca0fa097
+    legal: collection_94e6d9e1-59b7-4971-9223-de245bc6ae41
 
 # AWS Bedrock Settings (FALLBACK)
 bedrock:

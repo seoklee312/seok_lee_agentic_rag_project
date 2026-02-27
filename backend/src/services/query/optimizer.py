@@ -33,7 +33,7 @@ class QueryOptimizer:
         self.summary_cache = {}  # Cache conversation summaries
         logger.info(f"QueryOptimizer initialized with caching (understanding={self.understanding_cache_size}, summary={self.summary_cache_size})")
     
-    def understand_query(self, query: str, history: List = None) -> Dict[str, any]:
+    async def understand_query(self, query: str, history: List = None) -> Dict[str, any]:
         """Use LLM to understand query intent with HyDE and conversation summarization - WITH CACHING."""
         if not self.llm_service:
             return {'is_greeting': False, 'needs_web': True, 'web_query': query, 'rag_query': query, 'hypothetical_answer': '', 'intent': 'unknown', 'web_queries': [query]}
@@ -59,12 +59,13 @@ class QueryOptimizer:
         prompt = QUERY_UNDERSTANDING_PROMPT.format(context=context_str, query=query)
 
         try:
-            response = self.llm_service.generate(prompt, use_routing_model=True)  # Use fast routing model
+            response = await self.llm_service.generate([{"role": "user", "content": prompt}])
+            response_text = response.get('content', '')
             import json
-            start = response.find('{')
-            end = response.rfind('}') + 1
+            start = response_text.find('{')
+            end = response_text.rfind('}') + 1
             if start >= 0 and end > start:
-                result = json.loads(response[start:end])
+                result = json.loads(response_text[start:end])
                 # Ensure web_queries exists and limit to 2 for speed
                 if 'web_queries' not in result or not result['web_queries']:
                     result['web_queries'] = [result.get('web_query', query)]

@@ -612,14 +612,6 @@
                                     </label>
                                 </div>
                                 
-                                <!-- Agentic Mode Toggle -->
-                                <div style="display: flex; gap: 8px; border-left: 2px solid #ddd; padding-left: 12px;">
-                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                        <input type="checkbox" id="agenticMode" style="margin: 0; width: 16px; height: 16px; cursor: pointer;">
-                                        <span style="font-weight: 600; color: #667eea;">🎯 Agentic Mode</span>
-                                        <span style="font-size: 0.75em; color: #999;">(+grade, rewrite, validate)</span>
-                                    </label>
-                                </div>
                             </div>
                             <textarea 
                                 id="question" 
@@ -1005,20 +997,8 @@
                 return;
             }
             
-            debounceTimer = setTimeout(async () => {
-                try {
-                    const response = await fetch(`http://localhost:8000/v1/suggestions?q=${encodeURIComponent(query)}&limit=5`);
-                    const data = await response.json();
-                    
-                    if (data.suggestions && data.suggestions.length > 0) {
-                        showSuggestions(data.suggestions);
-                    } else {
-                        suggestionsDiv.style.display = 'none';
-                    }
-                } catch (error) {
-                    console.error('Suggestions error:', error);
-                }
-            }, 300);
+            // Suggestions disabled
+            suggestionsDiv.style.display = 'none';
         });
         
         function showSuggestions(suggestions) {
@@ -1079,34 +1059,24 @@
             showTypingIndicator();
 
             try {
-                // Get detail level and agentic mode
+                // Get detail level
                 const detailLevel = document.querySelector('input[name="detailLevel"]:checked').value;
                 const responseStyle = document.querySelector('input[name="responseStyle"]:checked').value;
-                const agenticMode = document.getElementById('agenticMode').checked;
                 
-                // Show appropriate flow steps based on mode
-                if (agenticMode) {
-                    setTimeout(() => showFlowStep('🎯 Routing query...'), 300);
-                    setTimeout(() => showFlowStep('📚 Retrieving documents...'), 800);
-                    setTimeout(() => showFlowStep('📊 Grading quality...'), 1300);
-                    setTimeout(() => showFlowStep('💬 Generating answer...'), 1800);
-                    setTimeout(() => showFlowStep('✅ Validating...'), 2300);
-                } else {
-                    setTimeout(() => showFlowStep('📚 Retrieving documents...'), 500);
-                    setTimeout(() => showFlowStep('✅ Grading relevance...'), 1000);
-                    setTimeout(() => showFlowStep('💬 Generating answer...'), 1500);
-                }
+                // Show flow steps
+                setTimeout(() => showFlowStep('📚 Retrieving documents...'), 500);
+                setTimeout(() => showFlowStep('✅ Grading relevance...'), 1000);
+                setTimeout(() => showFlowStep('💬 Generating answer...'), 1500);
                 
                 // Use streaming endpoint
-                const response = await fetch('http://localhost:8000/v1/query/stream', {
+                const response = await fetch('http://localhost:8000/v1/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         question: question,
                         history: conversationHistory.slice(0, -1),
                         detail_level: detailLevel,
-                        response_style: responseStyle,
-                        use_agentic: agenticMode
+                        response_style: responseStyle
                     })
                 });
 
@@ -1117,111 +1087,30 @@
                 removeTypingIndicator();
                 hideFlowIndicator();
                 
-                // Create assistant message bubble for streaming
+                // Parse JSON response
+                const data = await response.json();
+                
+                // Create assistant message bubble
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message assistant';
                 messageDiv.innerHTML = '<div class="message-content"></div>';
                 document.getElementById('chatMessages').appendChild(messageDiv);
                 
                 const contentDiv = messageDiv.querySelector('.message-content');
-                let fullAnswer = '';
-                let sources = [];
-                let metadata = {};
+                contentDiv.innerHTML = (data.answer || '').replace(/\n/g, '<br>');
                 
-                // Read SSE stream
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
+                const sources = data.sources || [];
+                const metadata = data.metadata || {};
                 
-                while (true) {
-                    const {done, value} = await reader.read();
-                    if (done) break;
-                    
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
-                    
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = JSON.parse(line.slice(6));
-                            
-                            if (data.type === 'token') {
-                                fullAnswer += data.content;
-                                // Format markdown in real-time
-                                let formatted = fullAnswer
-                                    .replace(/^# (.+)$/gm, '<h1 style="font-size: 1.4em; font-weight: 600; margin: 10px 0;">$1</h1>')
-                                    .replace(/^## (.+)$/gm, '<h2 style="font-size: 1.2em; font-weight: 600; margin: 8px 0;">$1</h2>')
-                                    .replace(/^### (.+)$/gm, '<h3 style="font-size: 1.1em; font-weight: 600; margin: 6px 0;">$1</h3>')
-                                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                                    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                                    .replace(/^- (.+)$/gm, '<li style="margin-left: 20px;">$1</li>')
-                                    .replace(/^---$/gm, '<hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 10px 0;">')
-                                    .replace(/\n\n/g, '</p><p style="margin: 8px 0;">')
-                                    .replace(/^\n/g, '');
-                                contentDiv.innerHTML = '<p style="margin: 8px 0;">' + formatted + '</p>';
-                                document.getElementById('chatMessages').scrollTop = 
-                                    document.getElementById('chatMessages').scrollHeight;
-                            } else if (data.type === 'done') {
-                                sources = data.sources || [];
-                                const stepTimings = data.step_timings || {};
-                                
-                                const responseTime = Date.now() - startTime;
-                                
-                                // Add metadata badges with yellow background and step timings
-                                const badgesDiv = document.createElement('div');
-                                badgesDiv.className = 'metrics-box';
-                                badgesDiv.style.cssText = 'background: #fff9c4; border: 2px solid #ffd54f; padding: 12px; border-radius: 10px; margin: 12px 0;';
-                                
-                                let metricsHTML = '<div style="font-weight: 600; margin-bottom: 8px; color: #333;">⚡ Performance Metrics</div>';
-                                metricsHTML += '<div style="display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.8em;">';
-                                
-                                // Total time
-                                metricsHTML += `<span style="background: #8b5cf6; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 600;">⏱️ Total: ${stepTimings.total || responseTime}ms</span>`;
-                                
-                                // Step timings
-                                if (stepTimings.query_optimization) {
-                                    metricsHTML += `<span style="background: #3b82f6; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 600;">🎯 Optimize: ${stepTimings.query_optimization}ms</span>`;
-                                }
-                                if (stepTimings.retrieval) {
-                                    metricsHTML += `<span style="background: #10b981; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 600;">📚 Retrieval: ${stepTimings.retrieval}ms</span>`;
-                                }
-                                
-                                // Web search with iterations and quality
-                                if (stepTimings.web_search) {
-                                    let webLabel = `🌐 Web: ${stepTimings.web_search}ms`;
-                                    if (stepTimings.web_iterations) {
-                                        webLabel += ` (${stepTimings.web_iterations}x)`;
-                                    }
-                                    if (stepTimings.web_quality) {
-                                        const qualityPercent = Math.round(stepTimings.web_quality * 100);
-                                        webLabel += ` ${qualityPercent}%`;
-                                    }
-                                    metricsHTML += `<span style="background: #06b6d4; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 600;">${webLabel}</span>`;
-                                }
-                                
-                                if (stepTimings.prompt_building) {
-                                    metricsHTML += `<span style="background: #f59e0b; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 600;">📝 Prompt: ${stepTimings.prompt_building}ms</span>`;
-                                }
-                                if (stepTimings.llm_generation) {
-                                    metricsHTML += `<span style="background: #ef4444; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 600;">🤖 LLM: ${stepTimings.llm_generation}ms</span>`;
-                                }
-                                
-                                metricsHTML += '</div>';
-                                badgesDiv.innerHTML = metricsHTML;
-                                contentDiv.appendChild(badgesDiv);
-                                
-                                // Extract and display confidence
-                                const confidenceMatch = fullAnswer.match(/\[Confidence:\s*(HIGH|MEDIUM|LOW)\]/i);
-                                if (confidenceMatch) {
-                                    const confidence = confidenceMatch[1].toUpperCase();
-                                    const confBar = createConfidenceBar(confidence);
-                                    contentDiv.appendChild(confBar);
-                                }
-                            } else if (data.type === 'error') {
-                                contentDiv.textContent = `❌ Error: ${data.message}`;
-                                hideFlowIndicator();
-                            }
-                        }
-                    }
-                }
+                // Store metadata globally for showMetrics
+                window.lastMetadata = {
+                    route: metadata.route || 'N/A',
+                    grade_score: metadata.grade_score || 0,
+                    hallucination_score: metadata.hallucination_score || 0,
+                    confidence: metadata.confidence || 0,
+                    total_latency_ms: data.total_latency_ms || 0,
+                    mode: data.mode || 'N/A'
+                };
                 
                 // Add collapsible sources
                 if (sources.length > 0) {
@@ -1239,13 +1128,12 @@
                     
                     sources.forEach((s, i) => {
                         const score = s.score ? ` (${(s.score * 100).toFixed(0)}%)` : '';
-                        const snippet = s.snippet ? s.snippet.substring(0, 150) + '...' : '';
+                        const snippet = s.snippet ? s.snippet.substring(0, 200) : '';
                         
-                        if (s.type === 'web') {
+                        if (s.url) {
                             sourcesList.innerHTML += `
                                 <div class="source-item" style="margin: 5px 0; padding-left: 15px; position: relative;">
-                                    🌐 <a href="${s.url}" target="_blank" style="color: white; text-decoration: none;">${s.title}</a>${score}
-                                    ${snippet ? `<div class="source-tooltip">${snippet}</div>` : ''}
+                                    🌐 <a href="${s.url}" target="_blank" style="color: #667eea; text-decoration: none;" title="${snippet}">${s.title || s.domain || 'Web Source'}</a>${score}
                                 </div>`;
                         } else {
                             // Extract date from doc_id (format: 2026-02-18T22:14:17_...)
@@ -1278,7 +1166,7 @@
                 `;
                 contentDiv.appendChild(actionsDiv);
                 
-                conversationHistory.push({ role: 'assistant', content: fullAnswer });
+                conversationHistory.push({ role: 'assistant', content: data.answer || '' });
                 
             } catch (error) {
                 removeTypingIndicator();
@@ -1333,7 +1221,20 @@
         }
 
         function showMetrics() {
-            alert('Detailed metrics:\n\n• Route: Vector Search\n• Grade Score: 0.87\n• Response Time: 450ms\n• Cache: Hit\n• Tokens: 1,234\n• Cost: $0.0025');
+            const m = window.lastMetadata || {};
+            const metrics = `
+📊 Quality Metrics
+
+Mode: ${m.mode}
+Route: ${m.route}
+Total Latency: ${m.total_latency_ms}ms
+
+Quality Scores:
+• Grade Score: ${(m.grade_score * 100).toFixed(0)}%
+• Hallucination Score: ${(m.hallucination_score * 100).toFixed(0)}%
+• Confidence: ${(m.confidence * 100).toFixed(0)}%
+            `.trim();
+            alert(metrics);
         }
 
         let isDarkMode = false;

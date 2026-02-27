@@ -1,11 +1,27 @@
 """Configuration constants for the application."""
 import yaml
+import os
+import re
 from pathlib import Path
+
+def _expand_env_vars(config):
+    """Recursively expand ${VAR} in config values."""
+    if isinstance(config, dict):
+        return {k: _expand_env_vars(v) for k, v in config.items()}
+    elif isinstance(config, list):
+        return [_expand_env_vars(item) for item in config]
+    elif isinstance(config, str):
+        # Replace ${VAR} with environment variable value
+        return re.sub(r'\$\{(\w+)\}', lambda m: os.getenv(m.group(1), m.group(0)), config)
+    return config
 
 # Load config
 config_path = Path(__file__).parent.parent.parent / 'config.yaml'
 with open(config_path, 'r') as f:
     _config = yaml.safe_load(f)
+
+# Expand environment variables
+_config = _expand_env_vars(_config)
 
 _app_config = _config.get('application', {})
 

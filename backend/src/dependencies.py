@@ -55,6 +55,11 @@ def get_query_optimizer(request: Request):
     return query_optimizer
 
 
+def get_xai_collections(request: Request):
+    """Get xAI Collections client from app state."""
+    return getattr(request.app.state, 'xai_collections', None)
+
+
 def get_search_orchestrator(request: Request):
     """Get or create search orchestrator."""
     from orchestration import SearchOrchestrator
@@ -62,4 +67,5 @@ def get_search_orchestrator(request: Request):
     web_search = get_web_search(request)
     rag = get_faiss_rag(request)
     cache = get_cache_service(request)
-    return SearchOrchestrator(web_search, rag, cache)
+    xai_collections = get_xai_collections(request)
+    return SearchOrchestrator(web_search, rag, cache, xai_collections=xai_collections)

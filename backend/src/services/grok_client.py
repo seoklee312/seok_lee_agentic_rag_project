@@ -155,16 +155,26 @@ class GrokClient:
                 
                 data = await response.json()
                 
-                # Extract response
-                choice = data.get('choices', [{}])[0]
-                message = choice.get('message', {})
-                content = message.get('content', '')
+                # Extract response - handle different response formats
+                if 'choices' in data:
+                    choice = data['choices'][0]
+                    message = choice.get('message', {})
+                    content = message.get('content', '')
+                elif 'message' in data:
+                    # Direct message format
+                    content = data['message'].get('content', '')
+                elif 'content' in data:
+                    # Direct content format
+                    content = data['content']
+                else:
+                    # Fallback - try to find content anywhere
+                    content = str(data)
                 
                 return {
                     'content': content,
                     'model': data.get('model', model),
                     'usage': data.get('usage', {}),
-                    'finish_reason': choice.get('finish_reason'),
+                    'finish_reason': data.get('finish_reason'),
                     'raw_response': data
                 }
     

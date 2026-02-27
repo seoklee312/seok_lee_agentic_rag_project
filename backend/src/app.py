@@ -85,6 +85,17 @@ async def startup_event():
     from services.cache import redis as cache_module
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
+    import re
+    
+    def _expand_env_vars(config):
+        """Recursively expand ${VAR} in config values."""
+        if isinstance(config, dict):
+            return {k: _expand_env_vars(v) for k, v in config.items()}
+        elif isinstance(config, list):
+            return [_expand_env_vars(item) for item in config]
+        elif isinstance(config, str):
+            return re.sub(r'\$\{(\w+)\}', lambda m: os.getenv(m.group(1), m.group(0)), config)
+        return config
     
     logger.info("Starting RAG system initialization")
     try:
@@ -93,6 +104,9 @@ async def startup_event():
         # Load config
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
+        
+        # Expand environment variables
+        config = _expand_env_vars(config)
         
         # Configure thread pool for blocking operations
         thread_pool_size = config.get('application', {}).get('thread_pool_size', 32)
@@ -133,6 +147,7 @@ async def startup_event():
         xai_collections = None
         if xai_collections_config.get('enabled', False):
             try:
+                logger.info(f"xAI Collections config: {xai_collections_config.get('collections', {})}")
                 xai_collections = XAICollectionsClient(xai_collections_config)
                 app.state.xai_collections = xai_collections
                 logger.info("xAI Collections initialized")
@@ -227,6 +242,7 @@ async def startup_event():
         
         intent_classifier = IntentClassifier(grok_client)
         domain_detector = DomainDetector(grok_client, domain_manager)
+        domain_detector.xai_collections = xai_collections  # Add xAI Collections for RAG-based detection
         
         logger.info("Intent classifier and domain detector initialized")
         
