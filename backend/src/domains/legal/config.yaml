@@ -1,0 +1,75 @@
+# Legal Domain Configuration
+
+domain:
+  name: legal
+  description: "Legal/Compliance domain for legal research and case law analysis"
+  
+  # System prompt for legal queries
+  system_prompt: |
+    You are a legal AI assistant providing accurate legal information and case law analysis.
+    
+    Guidelines:
+    - Provide accurate legal information based on case law and statutes
+    - Cite cases and legal sources when available
+    - Explain legal concepts clearly
+    - Use proper legal terminology with explanations
+    
+    IMPORTANT DISCLAIMER:
+    Always include: "⚠️ This is not legal advice. Consult a licensed attorney for legal matters."
+  
+  # Keywords for fast domain detection
+  keywords:
+    - law
+    - legal
+    - court
+    - case
+    - attorney
+    - lawyer
+    - rights
+    - miranda
+    - constitution
+    - precedent
+    - statute
+    - contract
+    - lawsuit
+    - litigation
+    - judge
+    - verdict
+    - trial
+    - criminal
+    - civil
+    - regulation
+
+# Collection ID (set after creating collection)
+collection_id: null
+
+# Retrieval configuration
+retrieval:
+  top_k: 10
+  rerank_method: bm25
+  score_threshold: 0.3
+
+# Sample legal documents (for demo)
+sample_documents:
+  - content: "Miranda v. Arizona, 384 U.S. 436 (1966): The Supreme Court held that criminal suspects must be informed of their rights before interrogation, including the right to remain silent and the right to an attorney. This established the 'Miranda warning' requirement."
+    metadata:
+      source: "case_law"
+      category: "criminal_procedure"
+      jurisdiction: "federal"
+      
+  - content: "Brown v. Board of Education, 347 U.S. 483 (1954): Landmark Supreme Court case that declared state laws establishing separate public schools for black and white students unconstitutional. Overturned Plessy v. Ferguson and the 'separate but equal' doctrine."
+    metadata:
+      source: "case_law"
+      category: "civil_rights"
+      jurisdiction: "federal"
+      
+  - content: "Contract Formation Elements: (1) Offer - definite proposal by one party; (2) Acceptance - unqualified agreement to terms; (3) Consideration - something of value exchanged; (4) Mutual Intent - parties intend to be bound; (5) Capacity - legal ability to contract; (6) Legality - lawful purpose."
+    metadata:
+      source: "legal_principles"
+      category: "contracts"
+      
+  - content: "Title VII of the Civil Rights Act of 1964 prohibits employment discrimination based on race, color, religion, sex, or national origin. Applies to employers with 15+ employees. Enforced by EEOC. Remedies include back pay, reinstatement, compensatory and punitive damages."
+    metadata:
+      source: "statutes"
+      category: "employment_law"
+      jurisdiction: "federal"

@@ -1,0 +1,72 @@
+# Medical Domain Configuration
+
+domain:
+  name: medical
+  description: "Medical/Healthcare domain for clinical decision support"
+  
+  # System prompt for medical queries
+  system_prompt: |
+    You are a medical AI assistant providing evidence-based healthcare information.
+    
+    Guidelines:
+    - Provide accurate, evidence-based medical information
+    - Cite sources when available
+    - Be clear and concise
+    - Use appropriate medical terminology with explanations
+    
+    IMPORTANT DISCLAIMER:
+    Always include: "⚠️ This is not medical advice. Consult a healthcare professional for medical decisions."
+  
+  # Keywords for fast domain detection
+  keywords:
+    - aspirin
+    - ibuprofen
+    - medication
+    - drug
+    - symptom
+    - disease
+    - medical
+    - health
+    - doctor
+    - patient
+    - treatment
+    - diagnosis
+    - prescription
+    - clinical
+    - healthcare
+    - medicine
+    - hospital
+    - diabetes
+    - hypertension
+    - cancer
+
+# Collection ID (set after creating collection)
+collection_id: null
+
+# Retrieval configuration
+retrieval:
+  top_k: 8
+  rerank_method: cross-encoder
+  score_threshold: 0.4
+
+# Sample medical documents (for demo)
+sample_documents:
+  - content: "Aspirin (acetylsalicylic acid) is a nonsteroidal anti-inflammatory drug (NSAID) used to reduce pain, fever, and inflammation. Common dosage: 325-650mg every 4-6 hours. Contraindications: Active bleeding, hemophilia, severe liver disease. Side effects: Gastrointestinal bleeding, ulcers."
+    metadata:
+      source: "medical_reference"
+      category: "medications"
+      
+  - content: "Ibuprofen is a nonsteroidal anti-inflammatory drug (NSAID) used to reduce fever and treat pain or inflammation. Common side effects include nausea, heartburn, dizziness. Long-term use may increase cardiovascular risk."
+    metadata:
+      source: "medical_reference"
+      category: "medications"
+      
+  - content: "Type 2 diabetes is characterized by insulin resistance and relative insulin deficiency. Management includes lifestyle modifications (diet, exercise), oral medications (metformin, sulfonylureas), and insulin therapy if needed. Target HbA1c: <7% for most adults."
+    metadata:
+      source: "clinical_guidelines"
+      category: "endocrinology"
+      
+  - content: "Hypertension (high blood pressure) is defined as systolic BP ≥130 mmHg or diastolic BP ≥80 mmHg. First-line treatments: ACE inhibitors, ARBs, calcium channel blockers, thiazide diuretics. Lifestyle modifications: reduce sodium, exercise, weight loss."
+    metadata:
+      source: "clinical_guidelines"
+      category: "cardiology"

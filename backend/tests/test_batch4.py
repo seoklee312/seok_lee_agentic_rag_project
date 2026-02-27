@@ -1,0 +1,43 @@
+"""Batch 4 - More ultra compact tests"""
+import unittest
+from unittest.mock import Mock, patch
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+class T(unittest.TestCase):
+    def t1(self): from services.faiss.manager import DocumentManager; m=DocumentManager(); ids=[m.add_document(f"d{i}",{}) for i in range(3)]; [m.delete_document(id) for id in ids]; self.assertEqual(len(m.list_documents()),0)
+    def t2(self): from services.state.memory import MemoryManager; m=MemoryManager(); m.remember("c1","q","a"); m.remember("c2","q","a"); self.assertEqual(len(m.recall("c1")),1)
+    def t3(self): from services.feedback.collector import FeedbackCollector; f=FeedbackCollector(); f.collect("q1",5,""); f.collect("q2",1,""); self.assertEqual(f.get_stats()['average_rating'],3.0)
+    def t4(self): from services.faiss.core.chunking import FixedChunker; c=FixedChunker(20,5); self.assertIsInstance(c.chunk("short"),list)
+    def t5(self): from services.query.optimizer import QueryOptimizer; o=QueryOptimizer(); self.assertIsInstance(o.optimize("what is python"),str)
+    def t6(self): from services.query.temporal_filter import TemporalFilter; t=TemporalFilter(); self.assertTrue(t.is_temporal("yesterday"))
+    def t7(self): from services.faiss.ingestion import DocumentIngestionService; from services.faiss.core.chunking import FixedChunker; s=DocumentIngestionService(FixedChunker(200,20)); r=s.process_document("content "*50,{}); self.assertGreater(len(r),0)
+    def t8(self): from services.validation.hallucination import HallucinationDetector; h=HallucinationDetector(); r=h.detect("test",[{"text":"source"}]); self.assertIn('is_hallucination',r)
+    def t9(self): from services.web_search.web import WebSearchService; w=WebSearchService(); self.assertIsInstance(w.should_use_web_search("weather"),bool)
+    def t10(self): from services.faiss.manager import DocumentManager; m=DocumentManager(); id=m.add_document("doc",{"src":"test"}); doc=m.get_document(id); self.assertEqual(doc['metadata']['src'],"test")
+    def t11(self): from services.state.memory import MemoryManager; m=MemoryManager(); m.remember("c","q","a"); m.clear("c"); self.assertEqual(len(m.recall("c")),0)
+    def t12(self): from services.feedback.collector import FeedbackCollector; f=FeedbackCollector(); f.collect("q",3,"ok"); fb=f.get_feedback("q"); self.assertEqual(fb['comment'],"ok")
+    def t13(self): from services.faiss.core.chunking import FixedChunker; c=FixedChunker(100,20); chunks=c.chunk("test "*50); self.assertIsInstance(chunks,list)
+    def t14(self): from services.query.optimizer import QueryOptimizer; o=QueryOptimizer(); kw=o.extract_keywords("machine learning"); self.assertIsInstance(kw,list)
+    def t15(self): from services.query.optimizer import QueryOptimizer; o=QueryOptimizer(); v=o.generate_variations("python"); self.assertIsInstance(v,list)
+    def t16(self): from services.faiss.manager import DocumentManager; m=DocumentManager(); id=m.add_document("a",{}); m.update_document(id,"b",{}); self.assertEqual(m.get_document(id)['content'],"b")
+    def t17(self): from services.state.memory import MemoryManager; m=MemoryManager(); for i in range(5): m.remember("c",f"q{i}",f"a{i}"); self.assertEqual(len(m.recall("c")),5)
+    def t18(self): from services.feedback.collector import FeedbackCollector; f=FeedbackCollector(); for i in range(5): f.collect(f"q{i}",i+1,""); self.assertEqual(f.get_stats()['total'],5)
+    def t19(self): from services.faiss.core.chunking import FixedChunker; c=FixedChunker(30,5); self.assertGreater(len(c.chunk("word "*30)),1)
+    def t20(self): from services.faiss.ingestion import DocumentIngestionService; from services.faiss.core.chunking import FixedChunker; s=DocumentIngestionService(FixedChunker(100,10)); r=s.process_document("test",{"k":"v"}); self.assertIn('metadata',r[0])
+    @patch('services.faiss.vector.SentenceTransformer')
+    def t21(self,m): from services.faiss.vector import VectorSearchService; import numpy as np; model=Mock(); model.encode=Mock(return_value=np.random.rand(2,384).astype('float32')); v=VectorSearchService(model); v.build_index(["a","b"]); self.assertIsNotNone(v.index)
+    def t22(self): from services.monitoring.metrics import MetricsCollector; m=MetricsCollector(); m.record_query("q",0.5,True); self.assertGreater(m.get_stats()['total_queries'],0)
+    @patch('services.cache.semantic.SentenceTransformer')
+    def t23(self,m): from services.cache.semantic import SemanticCache; import numpy as np; model=Mock(); model.encode=Mock(return_value=np.array([0.1,0.2])); m.return_value=model; c=SemanticCache(); c.set("k","v"); self.assertGreater(len(c.cache),0)
+    @patch('boto3.client')
+    def t24(self,m): from services.llm.service import BedrockService; b=BedrockService(); self.assertIsNotNone(b)
+    def t25(self): from orchestration.web_search import WebSearchAgent; w=WebSearchAgent(Mock(),Mock()); self.assertIsNotNone(w)
+    @patch('services.validation.hallucination.HallucinationDetector')
+    def t26(self,m): from orchestration.agentic import AgenticRAGOrchestrator; llm,r=Mock(),Mock(); r.embedding_model=None; a=AgenticRAGOrchestrator(llm,r); self.assertIsNotNone(a)
+    def t27(self): from services.faiss.manager import DocumentManager; m=DocumentManager(); m.add_document("1",{}); m.add_document("2",{}); self.assertEqual(len(m.list_documents()),2)
+    def t28(self): from services.state.memory import MemoryManager; m=MemoryManager(); m.remember("c","q","a"); ctx=m.get_context("c"); self.assertIn("a",ctx)
+    def t29(self): from services.feedback.collector import FeedbackCollector; f=FeedbackCollector(); f.collect("q1",5,""); f.collect("q2",4,""); self.assertEqual(f.get_stats()['total'],2)
+    def t30(self): from services.faiss.core.chunking import FixedChunker; c=FixedChunker(100,10); self.assertIsInstance(c.chunk("test"),list)
+
+if __name__=='__main__': unittest.main()

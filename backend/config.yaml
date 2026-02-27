@@ -1,0 +1,175 @@
+# RAG System Configuration
+
+# Grok API Settings (PRIMARY LLM)
+grok:
+  primary: true
+  enabled: true
+  api_key: ${GROK_API_KEY}  # Set via environment variable
+  base_url: https://api.x.ai/v1
+  model: grok-3  # Default model - WINNER: Best accuracy (86.7%), fastest (4.18s)
+  models:
+    default: grok-3  # BEST: Balanced speed, accuracy, cost
+    fast: grok-3-mini  # Cheapest & fastest for high-volume
+    best: grok-4-0709  # For complex reasoning tasks
+    vision: grok-2-vision-1212  # Vision model
+    reasoning: grok-4-1-fast-reasoning  # Reasoning model
+  max_tokens: 4096
+  temperature: 0.7
+  rate_limit: 60  # requests per minute
+  timeout: 30  # seconds
+  max_retries: 3
+  retry_delay: 1  # initial delay in seconds (exponential backoff)
+
+# xAI Collections API (RAG Vector Store)
+xai_collections:
+  enabled: true
+  api_key: ${XAI_API_KEY}  # Set via environment variable
+  base_url: https://api.x.ai/v1
+  default_collection: rag_demo
+  embedding_model: xai-embed-large
+  embedding_dimensions: 1024
+  chunk_size: 512
+  chunk_overlap: 50
+  top_k: 10
+  timeout: 30
+
+# AWS Bedrock Settings (FALLBACK)
+bedrock:
+  fallback: true
+  region: us-east-1
+  model_id: us.anthropic.claude-3-7-sonnet-20250219-v1:0  # Claude 3.7 Sonnet - best quality
+  routing_model_id: us.amazon.nova-lite-v1:0  # Nova Lite for routing only
+  conversational_model_id: us.anthropic.claude-3-7-sonnet-20250219-v1:0  # Claude 3.7 Sonnet - best for conversations
+  # Set credentials via AWS CLI or environment variables:
+  # aws configure
+  # OR set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+
+# Embedding Settings
+embeddings:
+  model: sentence-transformers/all-MiniLM-L6-v2
+  dimension: 384
+  chunk_method: semantic  # semantic or fixed
+  chunk_size: 500  # Used for fixed chunking
+  chunk_overlap: 50  # Used for fixed chunking
+  semantic_threshold: 0.5  # Cosine similarity threshold for semantic chunking
+  max_chunk_size: 1000  # Maximum chunk size in characters
+  min_chunk_size: 100  # Minimum chunk size in characters
+  
+  # Dimension reduction (optional, for faster search)
+  reduce_dimensions: false  # Set to true to enable PCA dimension reduction
+  target_dimension: 128  # Target dimension after reduction (from 384)
+
+# Adaptive Retrieval Settings
+adaptive_retrieval:
+  enabled: true  # Enable adaptive retrieval depth
+  base_k: 5  # Base number of results
+  min_k: 3  # Minimum results
+  max_k: 15  # Maximum results
+  # Factors: query length, multiple questions, comparisons, specificity
+  chunk_size: 500  # Used for fixed chunking
+  chunk_overlap: 50  # Used for fixed chunking
+  semantic_threshold: 0.5  # Cosine similarity threshold for semantic chunking
+  max_chunk_size: 1000  # Maximum chunk size in characters
+  min_chunk_size: 100  # Minimum chunk size in characters
+
+# FAISS Settings
+faiss:
+  index_path: ../faiss_index  # Relative to backend/src/
+  top_k: 5  # Number of results to retrieve
+  distance_threshold: 1.5  # Filter results with distance > threshold (lower is better for L2)
+  persist_index: true  # Save/load index on startup/shutdown
+  index_file: ../faiss_index/index.faiss
+  metadata_file: ../faiss_index/metadata.json
+
+# Reranker Settings
+reranker:
+  enabled: true
+  method: bm25  # bm25 (fast), cross-encoder (slow but accurate), hybrid, mmr
+  model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_k: 8  # Increased from 5 for better quality
+  score_threshold: 0.3  # Minimum rerank score (0-1) to keep results
+  # Hybrid reranker weights
+  ce_weight: 0.7  # Cross-encoder weight
+  bm25_weight: 0.3  # BM25 weight
+  # MMR reranker
+  mmr_lambda: 0.7  # 1.0 = pure relevance, 0.0 = pure diversity
+
+# Server Settings
+server:
+  host: 0.0.0.0
+  port: 8000
+
+# Redis Cache Settings
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+  socket_timeout: 2
+
+# Web Search Settings
+web_search:
+  vlm_enabled: false  # Disabled - threading issues with Playwright
+  vlm_model: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  vlm_use_bedrock: true
+  vlm_region: us-west-2
+  api_discovery_enabled: false  # Disabled - causes DNS failures for non-existent API endpoints
+  js_rendering_enabled: false  # Disabled - Playwright bot detection
+  llm_judge_enabled: false  # Disabled - adds 50+ LLM calls
+  llm_judge_model: us.amazon.nova-lite-v1:0  # Nova Lite for fast content judging
+  min_request_interval: 0.5
+  cache_ttl: 300
+  max_parallel_queries: 10  # Maximum parallel web search queries
+  max_workers: 10  # ThreadPoolExecutor workers for parallel searches
+  num_results_per_query: 3  # Reduced for speed  # Results per search query
+  deep_extract: true  # Enabled - needed for quality  # Enable deep extraction for better quality
+
+# Application Settings
+application:
+  # Query processing
+  max_history_messages: 6
+  max_content_preview: 200
+  max_doc_context_length: 300
+  
+  # Parallelization
+  preprocessing_workers: 2  # Workers for preprocessing + optimization
+  thread_pool_size: 32  # Thread pool for async blocking operations (LLM, FAISS)
+  
+  # Query preprocessing
+  spell_correction_enabled: true  # Enable spell correction
+  spell_correction_threshold: 0.3  # Only correct if confidence > threshold (0-1)
+  spell_cache_size: 1000  # Max cached corrections
+  
+  # Query understanding caching
+  understanding_cache_size: 500  # Cache query understanding results
+  summary_cache_size: 100  # Cache conversation summaries
+  
+  # Agentic workflow
+  use_agentic_workflow: false  # Enable full agentic orchestration (grade, rewrite, validate)
+  agentic_grade_threshold: 0.7  # Minimum grade to proceed (0-1)
+  agentic_max_retries: 2  # Max query rewrites
+  max_results_to_grade: 0  # Disable result grading (too slow - 28 LLM calls)
+  
+  # Rate limiting
+  query_rate_limit: 120  # requests per minute
+  
+  # Search
+  default_search_limit: 10
+  max_search_results: 20
+  
+  # Caching
+  cache_ttl_seconds: 3600  # 1 hour
+  web_cache_ttl: 1800  # 30 minutes
+  rag_cache_ttl: 3600  # 1 hour
+  
+  # Timeouts
+  web_search_timeout: 5  # seconds
+  rag_search_timeout: 3  # seconds
+  llm_timeout: 30  # seconds
+  
+  # Suggestions
+  suggestion_limit: 5
+  min_query_length_for_suggestions: 2
+  
+  # Auto-detection thresholds
+  cot_min_word_count: 10  # Minimum words to trigger chain-of-thought
+  cot_intents: ['factual', 'how_to']  # Intents that benefit from CoT

@@ -1,0 +1,33 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+botocore = ">=1.34.0"
+uvicorn = ">=0.27.0"
+pyyaml = ">=6.0"
+numpy = ">=1.24.0"
+torch = ">=2.1.0"
+httpx = ">=0.26.0"
+pytest = ">=7.4.0"
+pytest-cov = ">=4.1.0"
+requests = "*"
+python-dotenv = "*"
+slowapi = "*"
+fastapi = "*"
+pydantic = "*"
+boto3 = "*"
+sentence-transformers = "*"
+faiss-cpu = "*"
+rank-bm25 = "*"
+beautifulsoup4 = "*"
+redis = "*"
+playwright = "*"
+textblob = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3"
+textblob = "*"
